@@ -20,13 +20,14 @@ export function useFileWorkspace() {
   const readOnlyRef = useRef(false)
   const [status, setStatus] = useState<SaveStatus>('未保存')
   const [message, setMessage] = useState('保存先が未選択です。変更は再読み込みで消えます。')
+  const [messageIsError, setMessageIsError] = useState(false)
   const [folder, setFolder] = useState('')
   const [backups, setBackups] = useState<string[]>([])
   const [truncated, setTruncated] = useState(false)
   const supported = window.isSecureContext && typeof (window as PickerWindow).showDirectoryPicker === 'function' && !!navigator.locks
   function replace(next: WorkState) { current.current = next; setState(next) }
   function freeze(value: boolean) { readOnlyRef.current = value; setReadOnly(value) }
-  function begin() { operation.current = true; setBusy(true) }
+  function begin() { operation.current = true; setBusy(true); setMessageIsError(false) }
   function end() { operation.current = false; setBusy(false) }
   function failed(error: unknown) {
     dirty.current = true
@@ -67,6 +68,7 @@ export function useFileWorkspace() {
     if (operation.current || readOnlyRef.current) throw new Error('現在は読み取り専用です。保存状態を確認してください。')
     const next = applyAction(current.current, action)
     serialize(next, 1)
+    setMessageIsError(false)
     replace(next)
     dirty.current = true
     generation.current++
@@ -129,7 +131,7 @@ export function useFileWorkspace() {
     if (!store.current || operation.current || pending.current) return
     begin()
     try { const result = await store.current.listBackups(); setBackups(result.names); setTruncated(result.truncated) }
-    catch (error) { setMessage(storageMessage(error)) }
+    catch (error) { setMessage(storageMessage(error)); setMessageIsError(true) }
     finally { end() }
   }
   async function restore(name: string) {
@@ -149,5 +151,5 @@ export function useFileWorkspace() {
     } catch (error) { failed(error) }
     finally { end() }
   }
-  return { state, commit, status, message, folder, backups, truncated, supported, busy, readOnly, pendingCount, selectFolder, retry, listBackups, restore }
+  return { state, commit, status, message, messageIsError, folder, backups, truncated, supported, busy, readOnly, pendingCount, selectFolder, retry, listBackups, restore }
 }

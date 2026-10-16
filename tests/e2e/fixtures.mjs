@@ -33,7 +33,7 @@ export const test = base.extend({
     expect(requests.some(request => request.type === 'document')).toBe(true)
   }, { auto: true }],
   disk: async ({ context }, use) => {
-    const disk = { next: 'dummy-a', permission: 'granted', failWrite: false, files: new Map(), dirs: new Set(['dummy-a/', 'dummy-b/']) }
+    const disk = { next: 'dummy-a', permission: 'granted', failWrite: false, failList: false, files: new Map(), dirs: new Set(['dummy-a/', 'dummy-b/']) }
     await context.exposeBinding('__dummyFS', (_source, { op, path, create, text }) => {
       const error = name => ({ error: name })
       if (op === 'pick') return disk.next
@@ -51,6 +51,7 @@ export const test = base.extend({
         if (disk.failWrite) return error('QuotaExceededError')
         disk.files.set(path, text); return true
       }
+      if (op === 'entries' && disk.failList) return error('NotReadableError')
       if (op === 'entries') return [...disk.files.keys()].filter(key => key.startsWith(path) && !key.slice(path.length).includes('/')).map(key => [key.slice(path.length), { kind: 'file' }])
       throw new Error('Unknown mock operation')
     })

@@ -148,3 +148,48 @@ test('ページURLは全画面を区別し、不明なURLはダッシュボー�
   for (const page of pages) assert.equal(pageFromHash(pageHash(page)), page)
   for (const hash of ['', '#/unknown', '#/mine?name=test', '#/javascript:alert(1)']) assert.equal(pageFromHash(hash), 'dashboard')
 })
+
+test('タスクの複数ラベル・関係者の参照と重複を検証する', () => {
+  const task = { ...initialState.tasks[0], projects: ['p1', 'p2'], project: 'p1', relatedPeople: ['person1', 'person2'] }
+  const next = put(initialState, 'task', task)
+  assert.deepEqual(next.tasks.find(t => t.id === task.id).relatedPeople, ['person1', 'person2'])
+  assert.equal(projectCounts(next, 'p2').total, projectCounts(initialState, 'p2').total + 1)
+  for (const patch of [{ projects: ['p1', 'missing'] }, { projects: ['p1', 'p1'] }, { projects: ['p2'], project: 'p1' }, { relatedPeople: ['missing'] }, { relatedPeople: ['person1', 'person1'] }]) assert.throws(() => put(initialState, 'task', { ...task, ...patch }))
+})
+
+test('ラベルの親子関係は循環と欠落した親を拒否する', () => {
+  const state = put(initialState, 'project', { ...initialState.projects[1], parentId: 'p1', color: 'blue' })
+  assert.throws(() => put(state, 'project', { ...initialState.projects[0], parentId: 'p2' }), /循環/)
+  assert.throws(() => put(state, 'project', { ...initialState.projects[0], parentId: 'p1' }), /循環/)
+  assert.throws(() => put(state, 'project', { ...initialState.projects[0], parentId: 'missing' }), /見つかりません/)
+  assert.throws(() => put(state, 'project', { ...initialState.projects[0], color: 'url(https://example.com)' }))
+})
+
+test('設定の順序を移動し、編集してもその位置を維持する', () => {
+  for (const [kind, key] of [['person', 'people'], ['project', 'projects']]) {
+    const first = initialState[key][0]
+    const moved = applyAction(initialState, { type: 'move', kind, id: first.id, direction: 1 })
+    assert.equal(moved[key][1].id, first.id)
+    const edited = put(moved, kind, { ...first, name: first.name + '・変更' })
+    assert.equal(edited[key][1].id, first.id)
+    assert.equal(initialState[key][0].id, first.id)
+    assert.deepEqual(applyAction(edited, { type: 'move', kind, id: edited[key][0].id, direction: -1 }), edited)
+  }
+})
+
+test('以前の確認事項はID・詳細・相手・完了状態を保って一度だけ移行する', async () => {
+  const next = applyAction(initialState, { type: 'migrateNotes' })
+  assert.deepEqual(next.notes, [])
+  assert.equal(next.tasks.length, initialState.tasks.length + initialState.notes.length)
+  for (const note of initialState.notes) {
+    const task = next.tasks.find(t => t.id === note.id)
+    assert.equal(task.title, note.title)
+    assert.equal(task.detail, note.detail)
+    assert.equal(task.project, note.project)
+    assert.deepEqual(task.relatedPeople, [note.person])
+    assert.equal(task.status, note.checked ? '完了' : '未着手')
+  }
+  assert.deepEqual(applyAction(next, { type: 'migrateNotes' }), next)
+  const { pageFromHash } = await import('../src/navigation.ts')
+  assert.equal(pageFromHash('#/notes'), 'mine')
+})
