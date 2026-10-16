@@ -32,7 +32,7 @@
 
 ## Persistence
 
-- Access only user-authorized JSON files outside the repository.
+- Access only user-authorized JSON files. The user selected a persistent, Git-ignored data/ folder inside the project as the default storage location; previously selected external folders remain supported. Keep data/ and its backups out of Git and preserve them during source updates and cleanup.
 - Validate the complete schema with Zod, including version, limits, IDs and references.
 - Serialize writes, detect concurrent edits, and verify saved contents.
 - Protect existing data with recoverable backups; handle permission loss and write failures.

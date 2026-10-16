@@ -1,8 +1,8 @@
 import { test, expect, modal, nav, confirm, createTask } from './fixtures.mjs'
 
-test('実Chrome: 全画面、関係者・目標・依頼・確認事項の登録編集', async ({ page }) => {
+test('実Chrome: 全画面、関係者・ラベル・依頼の登録編集', async ({ page }) => {
   await page.goto('/')
-  for (const name of ['ダッシュボード', '自分のタスク', '依頼したタスク', '確認事項', '目標・施策', '設定']) await nav(page, name)
+  for (const name of ['ダッシュボード', '自分のタスク', '依頼したタスク', 'ラベル', '設定']) await nav(page, name)
   await page.getByRole('button', { name: '関係者を追加', exact: true }).click()
   await modal(page).getByLabel('名前（必須）').fill('検証担当者')
   await modal(page).getByRole('button', { name: '営業', exact: true }).click()
@@ -16,30 +16,29 @@ test('実Chrome: 全画面、関係者・目標・依頼・確認事項の登録
   await page.getByRole('group', { name: 'ラベルで絞り込み' }).getByRole('button', { name: '営業', exact: true }).click()
   await expect(page.getByRole('button', { name: '検証担当者・変更を編集' })).toBeVisible()
 
-  await nav(page, '目標・施策')
+  await nav(page, 'ラベル')
   await page.getByRole('button', { name: '新規登録', exact: true }).click()
-  await modal(page).getByLabel('目標・施策名（必須）').fill('検証目標')
+  await modal(page).getByLabel('ラベル名（必須）').fill('検証目標')
   await modal(page).getByRole('button', { name: '登録', exact: true }).click()
   await page.getByRole('row').filter({ has: page.getByRole('button', { name: '検証目標', exact: true }) }).getByRole('button', { name: '編集', exact: true }).click()
-  await modal(page).getByLabel('目標・施策名（必須）').fill('検証目標・変更')
+  await modal(page).getByLabel('ラベル名（必須）').fill('検証目標・変更')
   await modal(page).getByRole('button', { name: '変更を反映', exact: true }).click()
   await expect(page.getByRole('table').getByRole('button', { name: '検証目標・変更', exact: true })).toBeVisible()
 
-  for (const [name, title] of [['依頼したタスク', '検証依頼'], ['確認事項', '検証確認']]) {
+  for (const [name, title] of [['依頼したタスク', '検証依頼']]) {
     await nav(page, name)
     await page.getByRole('button', { name: '新規登録', exact: true }).click()
     await modal(page).getByLabel('タイトル（必須）').fill(title)
     await modal(page).getByRole('group', { name: '登録済みの相手' }).getByRole('button', { name: '検証担当者・変更', exact: true }).click()
-    await modal(page).getByRole('group', { name: '目標・施策', exact: true }).getByRole('button', { name: '検証目標・変更', exact: true }).click()
+    await modal(page).getByRole('group', { name: 'ラベル（複数選択）', exact: true }).getByRole('button', { name: '検証目標・変更', exact: true }).click()
     await modal(page).getByRole('button', { name: '登録', exact: true }).click()
     await page.getByRole('button', { name: title, exact: true }).click()
     await modal(page).getByLabel('タイトル（必須）').fill(title + '・変更')
-    if (name === '依頼したタスク') await modal(page).getByRole('group', { name: 'ステータス' }).getByRole('button', { name: 'レビュー待ち' }).click()
-    else await modal(page).getByRole('switch', { name: '確認済み' }).click()
+    await modal(page).getByRole('group', { name: 'ステータス' }).getByRole('button', { name: 'レビュー待ち' }).click()
     await modal(page).getByRole('button', { name: '変更を反映', exact: true }).click()
-    const record = name === '依頼したタスク' ? page.getByRole('row').filter({ hasText: title + '・変更' }) : page.getByRole('group', { name: title + '・変更', exact: true })
+    const record = page.getByRole('row').filter({ hasText: title + '・変更' })
     await expect(record).toContainText('検証担当者・変更')
-    await expect(record).toContainText(name === '依頼したタスク' ? 'レビュー待ち' : '確認済み')
+    await expect(record).toContainText('レビュー待ち')
   }
 })
 
@@ -98,8 +97,8 @@ test('実Chrome: 初回起動は全一覧が空で、保存先未選択と表示
   await expect(page.getByRole('banner')).toContainText('保存先未選択')
   await expect(page.getByText('今日', { exact: true })).toBeVisible()
   await expect(page.getByText('デモ基準日', { exact: true })).toHaveCount(0)
-  await expect(page.getByText('確認事項はありません。', { exact: true })).toBeVisible()
-  for (const name of ['自分のタスク', '依頼したタスク', '目標・施策', '設定']) {
+  await expect(page.getByRole('navigation').getByRole('button', { name: '確認事項', exact: true })).toHaveCount(0)
+  for (const name of ['自分のタスク', '依頼したタスク', 'ラベル', '設定']) {
     await nav(page, name)
     await expect(page.locator('tbody tr')).toHaveCount(0)
   }

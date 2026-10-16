@@ -733,3 +733,37 @@ button:disabled { cursor:not-allowed; opacity:.5; }
   .filters { padding:12px; gap:12px; }
   .pageHeading h1 { font-size:22px; }
 }
+
+.dateField { display: grid; gap: 6px; margin: 12px 0; }
+.dateInput { display: flex; gap: 6px; }
+.dateInput input { flex: 1; min-width: 0; }
+.dateInput input::-webkit-calendar-picker-indicator { display: none; }
+.calendar { width: min(360px, calc(100vw - 32px)); padding: 20px; border: 1px solid #d6dbe3; border-radius: 10px; color: #243047; }
+.calendar::backdrop { background: #17203366; }
+.calendarHeading { display: flex; justify-content: space-between; align-items: center; margin: 12px 0; }
+.calendarDays { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; text-align: center; margin: 6px 0; }
+.calendarDays button { justify-content: center; padding: 8px 4px; }
+.calendarDays span { padding: 4px; }
+.calendarDays button[aria-pressed="true"] { background: #315cc7; color: white; }
+.calendarDays button[aria-current="date"] { border-color: #315cc7; }
+.calendarDays > :nth-child(7n), .calendarDays > :nth-child(7n - 1) { color: #8e4061; }
+
+.taskTable { table-layout: fixed; min-width: 1060px; }
+.taskTable .colTitle { width: 30%; }
+.taskTable .colStatus { width: 130px; }
+.taskTable .colPriority { width: 90px; }
+.taskTable .colPerson { width: 150px; }
+.taskTable .colLabel { width: 180px; }
+.taskTable .colDate { width: 130px; }
+.taskTable td { overflow-wrap: anywhere; white-space: normal; vertical-align: top; }
+.taskTable .taskTitle { min-width: 0; overflow-wrap: anywhere; }
+.projectTag { display: inline-block; border-radius: 4px; padding: 2px 5px; margin: 2px; white-space: normal; overflow-wrap: anywhere; }
+[data-label-color="gray"] { color: #454f5d; background: #e9edf2; }
+[data-label-color="blue"] { color: #194a9b; background: #e5edff; }
+[data-label-color="green"] { color: #246242; background: #e0f2e8; }
+[data-label-color="orange"] { color: #854b08; background: #fff0d7; }
+[data-label-color="pink"] { color: #913c65; background: #fce4ef; }
+[data-label-color="purple"] { color: #63409a; background: #eee5fc; }
+.calendarDays button:disabled { opacity: .35; cursor: not-allowed; }
+.metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.dashboardBottom { grid-template-columns: 1fr; }

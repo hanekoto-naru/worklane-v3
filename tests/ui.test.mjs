@@ -63,13 +63,13 @@ test('大量データの一覧描画を100件に制限する', () => {
   assert.match(html, /次の100件/)
 })
 
-test('設定は関係者を初期表示し、目標・施策一覧を混在させない', async () => {
+test('設定は関係者を初期表示し、ラベル一覧を混在させない', async () => {
   const { default: Settings } = await import('../src/Settings.tsx')
   const html = renderToStaticMarkup(createElement(Settings, { state: initialState, openEditor() {}, disabled: true }))
   assert.match(html, /aria-label="設定項目"/)
   assert.match(html, /aria-label="関係者を検索"/)
   assert.match(html, /関係者を追加/)
-  assert.doesNotMatch(html, /目標・施策を追加/)
+  assert.doesNotMatch(html, /ラベルを追加/)
   assert.equal((html.match(/<table/g) ?? []).length, 1)
   assert.equal((html.match(/aria-pressed="true"/g) ?? []).length, 2)
   assert.match(html, /disabled=""[^>]*>.*?関係者を追加/)
@@ -100,7 +100,7 @@ test('関係者の複数ラベルを選択状態とフォーム値に反映す�
     state: initialState, commit() {}, close() {}, fileMode: true, readOnly: false,
   }))
   assert.equal((html.match(/aria-pressed="true"/g) ?? []).length, 2)
-  assert.match(html, /name="labels" value="チーム外,営業"/)
+  assert.ok(html.includes('name="labels" value="[&quot;チーム外&quot;,&quot;営業&quot;]"'))
   assert.doesNotMatch(html, /先輩|後輩/)
   for (const label of ['チーム外', '営業']) assert.ok(html.includes(label))
   assert.doesNotMatch(html, /<select|type="radio"/)

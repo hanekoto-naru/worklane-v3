@@ -88,7 +88,7 @@ test('A 模擬API: 実2タブ・Web Locksで競合停止し、未保存データ
 })
 
 
-test('A 模擬API: 非表示の既存ラベルは編集・保存・再読込で保持する', async ({ page, disk }) => {
+test('A 模擬API: 既存ラベルを表示し、編集・保存・再読込で保持する', async ({ page, disk }) => {
   disk.files.set('dummy-a/data.json', JSON.stringify({
     schemaVersion: 3, revision: 1, tasks: [], projects: [], questions: [],
     people: [{ id: 'legacy-person', name: '互換性検証担当者', labels: ['先輩', '後輩'] }],
@@ -98,10 +98,10 @@ test('A 模擬API: 非表示の既存ラベルは編集・保存・再読込で�
   await saved(page)
   await nav(page, '設定')
   const row = page.getByRole('row').filter({ hasText: '互換性検証担当者' })
-  await expect(row).not.toContainText('先輩')
-  await expect(row).not.toContainText('後輩')
+  await expect(row).toContainText('先輩')
+  await expect(row).toContainText('後輩')
   await page.getByRole('button', { name: '互換性検証担当者を編集', exact: true }).click()
-  for (const label of ['先輩', '後輩']) await expect(page.getByRole('button', { name: label, exact: true })).toHaveCount(0)
+  for (const label of ['先輩', '後輩']) await expect(modal(page).getByRole('button', { name: label, exact: true })).toHaveAttribute('aria-pressed', 'true')
   await modal(page).getByLabel('名前（必須）').fill('互換性検証担当者・変更')
   await modal(page).getByRole('button', { name: '営業', exact: true }).click()
   await modal(page).getByRole('button', { name: '変更を反映', exact: true }).click()

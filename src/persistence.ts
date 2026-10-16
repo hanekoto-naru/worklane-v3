@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { taskSchema, projectSchema, personSchema, noteSchema, taskUrlSchema } from './data.ts'
+import { taskSchema, projectSchema, personSchema, noteSchema, taskUrlSchema, legacyPersonLabels, taskProjects, validateProjectTree } from './data.ts'
 import type { WorkState } from './data.ts'
 
 export const MAX_BYTES = 5 * 1024 * 1024
@@ -10,7 +10,7 @@ const storedTasks = z.discriminatedUnion('kind', [
   taskSchema.options[1].extend({ url: taskUrlSchema, project: z.string().max(200) }),
 ])
 export const documentSchema = z.object({
-  schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3)]),
+  schemaVersion: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]),
   revision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER - 1),
   projects: z.array(projectSchema.extend({ archived: z.boolean() })).max(MAX_RECORDS),
   tasks: z.array(storedTasks).max(MAX_RECORDS),
@@ -19,6 +19,9 @@ export const documentSchema = z.object({
 }).strict().superRefine((data, ctx) => {
   if (data.schemaVersion === 1 && data.tasks.some(task => Array.isArray(task.url))) ctx.addIssue({ code: 'custom', message: '複数URLにはschemaVersion 2が必要です' })
   if (data.schemaVersion < 3 && data.people.some(person => person.labels !== undefined)) ctx.addIssue({ code: 'custom', message: '関係者ラベルにはschemaVersion 3が必要です' })
+  if (data.schemaVersion < 4 && data.people.some(person => person.labels && (person.labels.length > 4 || person.labels.some(label => !legacyPersonLabels.includes(label))))) ctx.addIssue({ code: 'custom', message: '自由な関係者ラベルにはschemaVersion 4が必要です' })
+  if (data.schemaVersion < 4 && (data.tasks.some(task => task.projects !== undefined || task.relatedPeople !== undefined) || data.projects.some(project => project.parentId !== undefined || project.color !== undefined))) ctx.addIssue({ code: 'custom', message: 'ラベル・関係者の拡張にはschemaVersion 4が必要です' })
+  try { validateProjectTree(data.projects) } catch { ctx.addIssue({ code: 'custom', message: 'ラベルの親子関係が不正です' }) }
   const records = [...data.projects, ...data.tasks, ...data.people, ...data.questions]
   if (records.length > MAX_RECORDS) ctx.addIssue({ code: 'custom', message: 'レコード数の上限を超えています' })
   if (new Set(records.map(record => record.id)).size !== records.length) ctx.addIssue({ code: 'custom', message: 'IDが重複しています' })
@@ -29,6 +32,8 @@ export const documentSchema = z.object({
   }
   for (const task of data.tasks) {
     if (task.kind === 'delegated' && !people.has(task.owner)) ctx.addIssue({ code: 'custom', message: '担当者の参照が不正です' })
+    if (taskProjects(task).some(id => !projects.has(id)) || (task.projects && task.project !== (task.projects[0] ?? ''))) ctx.addIssue({ code: 'custom', message: 'ラベルの参照が不正です' })
+    if (task.relatedPeople?.some(id => !people.has(id))) ctx.addIssue({ code: 'custom', message: '関係者の参照が不正です' })
   }
   for (const question of data.questions) {
     if (!people.has(question.person)) ctx.addIssue({ code: 'custom', message: '確認相手の参照が不正です' })
@@ -43,14 +48,16 @@ export function parseDocument(text: string): WorkDocument {
   if (new TextEncoder().encode(text).length > MAX_BYTES) throw new StorageError('invalid', 'ファイルサイズの上限（5 MiB）を超えています。')
   let value: unknown
   try { value = JSON.parse(text) } catch { throw new StorageError('invalid', 'JSONを読み込めません。正本は変更していません。') }
-  if (value && typeof value === 'object' && 'schemaVersion' in value && value.schemaVersion !== 1 && value.schemaVersion !== 2 && value.schemaVersion !== 3) throw new StorageError('version', '未対応のschemaVersionです。自動変換は行いません。')
+  if (value && typeof value === 'object' && 'schemaVersion' in value && ![1, 2, 3, 4].includes(Number(value.schemaVersion))) throw new StorageError('version', '未対応のschemaVersionです。自動変換は行いません。')
   const result = documentSchema.safeParse(value)
   if (!result.success) throw new StorageError('invalid', 'データの形式・上限・ID・参照関係が不正です。')
   return result.data
 }
 export const toState = (doc: WorkDocument): WorkState => ({ projects: doc.projects, tasks: doc.tasks, people: doc.people, notes: doc.questions })
+export const needsV4 = (state: WorkState) => state.people.some(person => person.labels && (person.labels.length > 4 || person.labels.some(label => !legacyPersonLabels.includes(label)))) || state.tasks.some(task => task.projects !== undefined || task.relatedPeople !== undefined) || state.projects.some(project => project.parentId !== undefined || project.color !== undefined)
+export const documentVersion = (state: WorkState) => needsV4(state) ? 4 : state.people.some(person => person.labels !== undefined) ? 3 : state.tasks.some(task => Array.isArray(task.url)) ? 2 : 1
 export function serialize(state: WorkState, revision: number): string {
-  const text = JSON.stringify({ schemaVersion: state.people.some(person => person.labels !== undefined) ? 3 : state.tasks.some(task => Array.isArray(task.url)) ? 2 : 1, revision, projects: state.projects, tasks: state.tasks, people: state.people, questions: state.notes }, null, 2) + '\n'
+  const text = JSON.stringify({ schemaVersion: documentVersion(state), revision, projects: state.projects, tasks: state.tasks, people: state.people, questions: state.notes }, null, 2) + '\n'
   parseDocument(text)
   return text
 }
@@ -182,7 +189,7 @@ export function browserLock(): Lock {
 }
 export async function rejectRepository(directory: LocalDirectory) {
   for (const marker of ['.git', 'node_modules']) {
-    try { await directory.getDirectoryHandle(marker); throw new StorageError('blocked', 'リポジトリ外の専用フォルダを選択してください。') } catch (error) { if (!isNotFound(error)) throw error }
+    try { await directory.getDirectoryHandle(marker); throw new StorageError('blocked', 'ソースのルートではなく、Git除外対象のdataフォルダを選択してください。') } catch (error) { if (!isNotFound(error)) throw error }
   }
-  try { await directory.getFileHandle('package.json'); throw new StorageError('blocked', 'リポジトリ外の専用フォルダを選択してください。') } catch (error) { if (!isNotFound(error)) throw error }
+  try { await directory.getFileHandle('package.json'); throw new StorageError('blocked', 'ソースのルートではなく、Git除外対象のdataフォルダを選択してください。') } catch (error) { if (!isNotFound(error)) throw error }
 }

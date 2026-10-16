@@ -22,13 +22,15 @@ export const urlSchema = z.string().trim().max(2048).refine(value => {
 export const taskUrlSchema = z.union([urlSchema, z.array(urlSchema.refine(value => value.length > 0, 'URLを入力してください')).min(2).max(10, '関連URLは10件までです')])
 export const relatedUrls = (url: string | string[]) => Array.isArray(url) ? url : url ? [url] : []
 export const personLabels = ['チーム外', '営業'] as const
-// Preserve stored labels without offering them for new selections.
-const storedPersonLabels = ['先輩', '後輩', ...personLabels] as const
-export const personSchema = z.object({ id: required, name: required, labels: z.array(z.enum(storedPersonLabels)).max(4).refine(values => new Set(values).size === values.length, 'ラベルが重複しています').optional() }).strict()
-export const projectSchema = z.object({ id: required, name: required, description: detail, due: date, archived: z.boolean().default(false) }).strict()
+export const legacyPersonLabels: readonly string[] = ['先輩', '後輩', ...personLabels]
+export const personSchema = z.object({ id: required, name: required, labels: z.array(z.string().trim().min(1).max(40)).max(20).refine(values => new Set(values).size === values.length, 'ラベルが重複しています').optional() }).strict()
+export const availablePersonLabels = (people: Person[]) => [...new Set([...personLabels, ...people.flatMap(person => person.labels ?? [])])]
+export const labelColors = ['gray', 'blue', 'green', 'orange', 'pink', 'purple'] as const
+const ids = z.array(required).max(100).refine(values => new Set(values).size === values.length, '重複しています')
+export const projectSchema = z.object({ id: required, name: required, description: detail, due: date, archived: z.boolean().default(false), parentId: z.string().max(200).optional(), color: z.enum(labelColors).optional() }).strict()
 const taskFields = {
   id: required, title: required, detail, priority: z.enum(['なし', '高', '中', '低']),
-  due: date, project: z.string(), url: taskUrlSchema.default(''),
+  due: date, project: z.string(), projects: ids.optional(), relatedPeople: ids.optional(), url: taskUrlSchema.default(''),
 }
 export const taskSchema = z.discriminatedUnion('kind', [
   z.object({ ...taskFields, kind: z.literal('mine'), status: z.enum(mineStatuses), owner: z.literal('自分') }).strict(),
@@ -51,9 +53,51 @@ export type RecordKind = 'task' | 'note' | 'project' | 'person'
 export type WorkAction =
   | { type: 'put'; kind: RecordKind; value: unknown; person?: Person }
   | { type: 'delete'; kind: 'task' | 'note'; id: string }
+  | { type: 'move'; kind: 'person' | 'project'; id: string; direction: -1 | 1 }
+  | { type: 'migrateNotes' }
+
+export const taskProjects = (task: Pick<Task, 'project' | 'projects'>) => task.projects ?? (task.project ? [task.project] : [])
+export function validateProjectTree(projects: Project[]) {
+  const parents = new Map(projects.map(p => [p.id, p.parentId]))
+  const visited = new Set<string>()
+  for (const project of projects) {
+    const path = new Set<string>()
+    let current: string | undefined = project.id
+    while (current && !visited.has(current)) {
+      if (!parents.has(current)) throw new Error('親ラベルが見つかりません')
+      if (path.has(current)) throw new Error('親子関係が循環しています')
+      path.add(current); current = parents.get(current)
+    }
+    for (const id of path) visited.add(id)
+  }
+}
+export function projectPath(projects: Project[], id: string): string {
+  const names: string[] = []
+  const visited = new Set<string>()
+  let current = projects.find(p => p.id === id)
+  while (current && !visited.has(current.id)) {
+    visited.add(current.id); names.unshift(current.name)
+    current = projects.find(p => p.id === current?.parentId)
+  }
+  return names.join(' / ')
+}
 
 // All mutations are validated here; this module has no persistence or UI dependency.
 export function applyAction(state: WorkState, action: WorkAction): WorkState {
+  if (action.type === 'move') {
+    const key = action.kind === 'person' ? 'people' : 'projects'
+    const index = state[key].findIndex(item => item.id === action.id)
+    if (index < 0) throw new Error('対象が見つかりません')
+    const target = index + action.direction
+    if (target < 0 || target >= state[key].length) return state
+    const items = [...state[key]]
+    ;[items[index], items[target]] = [items[target], items[index]]
+    return { ...state, [key]: items }
+  }
+  if (action.type === 'migrateNotes') {
+    const tasks: Task[] = state.notes.map(note => taskSchema.parse({ id: note.id, title: note.title, detail: note.detail, kind: 'mine', status: note.checked ? '完了' : '未着手', owner: '自分', priority: 'なし', due: '', project: note.project, relatedPeople: [note.person], url: '' }))
+    return { ...state, tasks: [...state.tasks, ...tasks], notes: [] }
+  }
   if (action.type === 'delete') {
     const key = action.kind === 'task' ? 'tasks' : 'notes'
     if (!state[key].some(item => item.id === action.id)) throw new Error('対象が見つかりません')
@@ -72,16 +116,24 @@ export function applyAction(state: WorkState, action: WorkAction): WorkState {
     if (other !== key && next[other].some(item => item.id === value.id)) throw new Error('IDが重複しています')
   }
   if ('project' in value && value.project && !next.projects.some(p => p.id === value.project)) throw new Error('プロジェクトが見つかりません')
+  if ('kind' in value) {
+    if (taskProjects(value).some(id => !next.projects.some(p => p.id === id))) throw new Error('ラベルが見つかりません')
+    if (value.projects && value.project !== (value.projects[0] ?? '')) throw new Error('ラベルの参照が不正です')
+    if (value.relatedPeople?.some(id => !next.people.some(p => p.id === id))) throw new Error('関係者が見つかりません')
+  }
   const personId = 'person' in value ? value.person : 'kind' in value && value.kind === 'delegated' ? value.owner : ''
   if (personId && !next.people.some(p => p.id === personId)) throw new Error('担当者・確認相手が見つかりません')
   if ('kind' in value) {
     const previous = next.tasks.find(t => t.id === value.id)
     if (previous && previous.kind !== value.kind) throw new Error('タスクの種類は変更できません')
   }
-  return { ...next, [key]: [...next[key].filter(item => item.id !== value.id), value] }
+  const exists = next[key].some(item => item.id === value.id)
+  const result = { ...next, [key]: exists ? next[key].map(item => item.id === value.id ? value : item) : [...next[key], value] }
+  validateProjectTree(result.projects)
+  return result
 }
 export function projectCounts(state: WorkState, id: string) {
-  const tasks = state.tasks.filter(t => t.project === id)
+  const tasks = state.tasks.filter(t => taskProjects(t).includes(id))
   const notes = state.notes.filter(n => n.project === id)
   const total = tasks.length + notes.length
   const done = tasks.filter(t => t.status === '完了').length + notes.filter(n => n.checked).length

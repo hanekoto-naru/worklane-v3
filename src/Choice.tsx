@@ -74,3 +74,37 @@ export function Toggle({ label, name, checked, defaultChecked = false, onChange,
       }}><span aria-hidden="true">{active ? <IconCheck size={14} /> : '−'}</span>{label}<strong>{active ? 'ON' : 'OFF'}</strong></button>
   </span>
 }
+
+export function MultiChoice({ label, name, options, values, onChange, disabled, maxSelected = 100 }: {
+  label: string; name: string; options: ChoiceOption[]; values: string[]; onChange: (values: string[]) => void; disabled?: boolean; maxSelected?: number
+}) {
+  const [opened, setOpened] = useState(false)
+  const [query, setQuery] = useState('')
+  const [limit, setLimit] = useState(100)
+  const dialog = useRef<HTMLDialogElement>(null)
+  const trigger = useRef<HTMLButtonElement>(null)
+  const heading = useId()
+  const many = options.length > 7
+  function close() { dialog.current?.close(); setOpened(false); trigger.current?.focus() }
+  const matches = searchChoices(options, query)
+  function buttons(items: ChoiceOption[]) {
+    return <div className={s.choiceButtons} role="group" aria-label={label} onKeyDown={event => {
+      const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')]
+      const next = nextChoiceIndex(buttons.indexOf(event.target as HTMLButtonElement), buttons.length, event.key)
+      if (next !== null) { event.preventDefault(); buttons[next]?.focus() }
+    }}>{items.map(option => <button type="button" key={option.value} disabled={disabled || (!values.includes(option.value) && values.length >= maxSelected)} aria-pressed={values.includes(option.value)}
+      onClick={() => onChange(values.includes(option.value) ? values.filter(value => value !== option.value) : [...values, option.value])}>
+      {values.includes(option.value) && <IconCheck size={14} aria-hidden="true" />}{option.label}
+    </button>)}</div>
+  }
+  return <div className={s.choice}><span className={s.choiceLabel}>{label}</span><input type="hidden" name={name} value={JSON.stringify(values)} />
+    {many ? <><button type="button" ref={trigger} disabled={disabled} aria-haspopup="dialog" aria-expanded={opened} onClick={() => { setQuery(''); setLimit(100); setOpened(true) }}><IconSearch size={16} />候補を検索・選択（{values.length}件）</button><small>{options.filter(option => values.includes(option.value)).map(option => option.label).join('、') || '未選択'}</small></> : buttons(options)}
+    {!options.length && <small>設定から追加できます。</small>}
+    {opened && createPortal(<dialog ref={element => { dialog.current = element; if (element && !element.open) element.showModal() }} className={s.choiceDialog} aria-labelledby={heading} onCancel={event => { event.preventDefault(); event.stopPropagation(); close() }}>
+      <div className={s.sectionHeading}><h2 id={heading}>{label}</h2><button type="button" onClick={close}>選択を完了</button></div>
+      <label className={s.search}><IconSearch size={16} /><input autoFocus value={query} aria-label="候補を検索" onChange={event => { setQuery(event.target.value); setLimit(100) }} /></label>
+      <p role="status">{matches.length}件・選択中{values.length}件</p>{buttons(matches.slice(0, limit))}
+      {matches.length > limit && <button type="button" onClick={() => setLimit(limit + 100)}>次の100件を表示</button>}
+    </dialog>, document.body)}
+  </div>
+}

@@ -374,3 +374,48 @@ test('大量バックアップ一覧は走査上限で止まり、ファイル�
   await assert.rejects(store.restore(result.names[0]))
   assert.deepEqual(disk.files, before)
 })
+
+test('schemaVersion 4の拡張・順序・確認事項移行を保存し、旧版バックアップから復元する', async () => {
+  const { applyAction } = await import('../src/data.ts')
+  const { disk, store } = await fixture()
+  const original = disk.files.get('data.json')
+  let next = applyAction(initialState, { type: 'migrateNotes' })
+  next = { ...next, people: [...next.people].reverse().map((p, i) => i === 0 ? { ...p, labels: ['設計', '顧客窓口'] } : p), projects: next.projects.map((p, i) => i === 1 ? { ...p, parentId: 'p1', color: 'green' } : p), tasks: next.tasks.map((t, i) => i === 0 ? { ...t, project: 'p1', projects: ['p1', 'p2'] } : t) }
+  await store.save(next)
+  const saved = diskDoc(disk)
+  assert.equal(saved.schemaVersion, 4)
+  assert.deepEqual(saved.questions, [])
+  assert.deepEqual(saved.people.map(p => p.id), next.people.map(p => p.id))
+  assert.deepEqual(saved.tasks[0].projects, ['p1', 'p2'])
+  assert.equal(saved.projects[1].parentId, 'p1')
+  assert.equal(saved.projects[1].color, 'green')
+  const restarted = new FileStore(disk.directory, disk.lock)
+  assert.deepEqual(await restarted.load(), saved)
+  const backup = [...disk.files.entries()].find(([path, text]) => path.startsWith('backups/') && text === original)[0].split('/').at(-1)
+  await store.restore(backup)
+  assert.equal(diskDoc(disk).schemaVersion, 1)
+  assert.deepEqual(diskDoc(disk).questions, parseDocument(original).questions)
+})
+
+test('schemaVersion 4も不正なラベル・親子関係・関連参照を読み込み時に拒否する', () => {
+  const base = parseDocument(serialize(initialState, 1))
+  base.schemaVersion = 4
+  for (const mutate of [
+    d => { d.people[0].labels = ['重複', '重複'] },
+    d => { d.people[0].labels = [' '] },
+    d => { d.people[0].labels = ['a'.repeat(41)] },
+    d => { d.projects[0].parentId = d.projects[0].id },
+    d => { d.projects[0].parentId = 'missing' },
+    d => { d.projects[0].parentId = 'p2'; d.projects[1].parentId = 'p1' },
+    d => { d.tasks[0].relatedPeople = ['missing'] },
+    d => { d.tasks[0].projects = ['p1', 'missing'] },
+    d => { d.tasks[0].projects = ['p2'] },
+  ]) {
+    const doc = structuredClone(base); mutate(doc)
+    assert.throws(() => parseDocument(JSON.stringify(doc)))
+  }
+  base.people[0].labels = ['任意のラベル']
+  assert.deepEqual(parseDocument(JSON.stringify(base)).people[0].labels, ['任意のラベル'])
+  base.schemaVersion = 3
+  assert.throws(() => parseDocument(JSON.stringify(base)))
+})
