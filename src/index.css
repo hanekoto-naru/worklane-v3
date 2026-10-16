@@ -1,0 +1,113 @@
+:root {
+  font-family:Arial,-apple-system,BlinkMacSystemFont,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;
+  font-size:14px;
+  line-height:1.6;
+  font-synthesis:none;
+  text-rendering:optimizeLegibility;
+  -webkit-font-smoothing:antialiased;
+  color-scheme:light;
+  --bg:#fff;
+  --sidebar:#f8fafd;
+  --text:#202124;
+  --muted:#5f6368;
+  --border:#dadce0;
+  --accent:#1a73e8;
+  --accent-soft:#e8f0fe;
+  --hover:#f1f3f4;
+  --radius:6px;
+  color:var(--text);
+  background:var(--bg)
+}
+* {
+  box-sizing:border-box
+}
+body {
+  margin:0
+}
+button,input,textarea {
+  font:inherit
+}
+button {
+  cursor:pointer;
+  color:inherit
+}
+button,input,textarea {
+  border-radius:var(--radius)
+}
+button {
+  border:0;
+  background:none
+}
+button:hover {
+  background:var(--hover)
+}
+button:focus-visible,input:focus-visible,textarea:focus-visible,a:focus-visible {
+  outline:2px solid var(--accent);
+  outline-offset:3px
+}
+button,input,textarea {
+  transition:background-color .15s,border-color .15s
+}
+svg {
+  flex-shrink:0;
+  vertical-align:middle
+}
+h1,h2,p {
+  margin:0
+}
+table {
+  width:100%;
+  border-collapse:collapse;
+  text-align:left;
+  white-space:nowrap
+}
+th {
+  font-weight:600;
+  color:var(--text);
+  font-size:12px;
+  background:var(--sidebar);
+  padding:11px 16px;
+  border-block:1px solid var(--border)
+}
+td {
+  padding:13px 16px;
+  border-bottom:1px solid var(--border);
+  font-size:13px
+}
+tbody tr:hover {
+  background:var(--hover)
+}
+small {
+  font-size:11px
+}
+input[type=checkbox] {
+  accent-color:var(--accent);
+  width:17px;
+  height:17px;
+  cursor:pointer
+}
+progress {
+  width:95px;
+  height:5px;
+  appearance:none;
+  border:0;
+  border-radius:4px;
+  overflow:hidden;
+  background:var(--border)
+}
+progress::-webkit-progress-bar {
+  background:var(--border)
+}
+progress::-webkit-progress-value {
+  background:var(--accent)
+}
+progress::-moz-progress-bar {
+  background:var(--accent)
+}
+@media(prefers-reduced-motion:reduce) {
+  *,*::before,*::after {
+    transition:none!important;
+    animation:none!important;
+    scroll-behavior:auto!important
+  }
+}
