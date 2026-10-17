@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { IconLayoutDashboard, IconCheckbox, IconUsers, IconFolder, IconSearch, IconArrowUpRight, IconChevronRight, IconShieldLock, IconLayoutSidebarLeftCollapse, IconArrowRight, IconCalendar, IconFlag, IconPlus, IconSettings } from '@tabler/icons-react'
-import { projectCounts, sortTasks, mineStatuses, delegatedStatuses, shortDate, taskProjects, projectPath } from './data'
+import { projectCounts, sortTasks, shortDate, taskProjects, projectPath } from './data'
 import Editor from './Editor'
 import { pageFromHash, pageHash } from './navigation'
 import type { Page } from './navigation'
@@ -67,16 +67,16 @@ function App() {
   }, [])
   useEffect(() => { if (!notice) return; const timer = window.setTimeout(() => setNotice(''), 4000); return () => window.clearTimeout(timer) }, [notice])
   useEffect(() => { document.title = `${current.label} | Worklane` }, [current.label])
-  const visibleTasks = sortTasks(tasks.filter(t => (t.kind === page || page === 'projects') && (owner === 'all' || t.owner === owner || t.relatedPeople?.includes(owner)) && (project === 'all' || taskProjects(t).includes(project)) && (filter === 'all' || t.status === filter) && match(`${t.title} ${t.detail} ${personName(t.owner)} ${t.relatedPeople?.map(personName).join(" ") ?? ""} ${taskProjects(t).map(projectName).join(" ")}`)), sort)
+  const visibleTasks = sortTasks(tasks.filter(t => (t.kind === page || page === 'projects') && (owner === 'all' || t.owner === owner || t.relatedPeople?.includes(owner)) && (project === 'all' || taskProjects(t).includes(project)) && match(`${t.title} ${t.detail} ${personName(t.owner)} ${t.relatedPeople?.map(personName).join(" ") ?? ""} ${taskProjects(t).map(projectName).join(" ")}`)), sort)
 
   const visibleProjects = projects.filter(p => (filter === 'archived' ? p.archived : filter === 'all' ? !p.archived : true) && match(`${p.name} ${p.description}`)).sort((a, b) => sort === 'title' ? a.name.localeCompare(b.name, 'ja') : (a.due || '9999').localeCompare(b.due || '9999'))
 
   function taskTable(rows: Task[], delegated = false) {
-    return <Paged key={listKey} items={rows}>{pageRows => <div className={s.tableScroll}><table className={s.taskTable}><colgroup><col className={s.colTitle} /><col className={s.colStatus} /><col className={s.colPriority} /><col className={s.colPerson} /><col className={s.colLabel} /><col className={s.colDate} />{delegated && <col className={s.colDate} />}</colgroup><thead><tr><th scope="col">タスク</th><th scope="col">ステータス</th><th scope="col">優先度</th><th scope="col">{delegated ? '担当者・関係者' : '関係者'}</th><th scope="col">ラベル</th><th scope="col">期限</th>{delegated && <th scope="col">次回確認</th>}</tr></thead><tbody>{pageRows.map(t => <tr key={t.id} className={s.interactiveRow} onClick={event => openFromRow(event, () => openEditor({ kind: 'task', value: t }), workspace.busy)}>
-      <td><button className={s.taskTitle} data-row-action="true" disabled={workspace.busy} onClick={() => openEditor({ kind: 'task', value: t })}><span>{t.title}</span></button></td>
+    return <Paged key={listKey} items={rows}>{pageRows => <div className={s.tableScroll}><table className={s.taskTable}><colgroup><col className={s.colStatus} /><col className={s.colTitle} /><col className={s.colPriority} /><col className={s.colPerson} /><col className={s.colDate} />{delegated && <col className={s.colDate} />}</colgroup><thead><tr><th scope="col">ステータス</th><th scope="col">タスク</th><th scope="col">優先度</th><th scope="col">{delegated ? '担当者・関係者' : '関係者'}</th><th scope="col">期限</th>{delegated && <th scope="col">次回確認</th>}</tr></thead><tbody>{pageRows.map(t => <tr key={t.id} className={s.interactiveRow} onClick={event => openFromRow(event, () => openEditor({ kind: 'task', value: t }), workspace.busy)}>
       <td><span className={s.badge} data-status={t.status}><span className={s.dot} />{t.status}</span></td>
+      <td><button className={s.taskTitle} data-row-action="true" disabled={workspace.busy} onClick={() => openEditor({ kind: 'task', value: t })}><span>{t.title}</span></button>{taskProjects(t).length > 0 && <div className={s.taskLabels} aria-label="ラベル">{taskProjects(t).map(id => <span key={id} className={s.projectTag} data-label-color={projects.find(p => p.id === id)?.color ?? 'gray'}>{projectName(id)}</span>)}</div>}</td>
       <td><span className={t.priority === '高' ? s.high : s.muted}><IconFlag size={13} /> {t.priority}</span></td>
-      <td>{[...(t.kind === 'delegated' ? [personName(t.owner)] : []), ...(t.relatedPeople ?? []).filter(id => id !== t.owner).map(personName)].join('、') || '—'}</td><td>{taskProjects(t).length ? taskProjects(t).map(id => <span key={id} className={s.projectTag} data-label-color={projects.find(p => p.id === id)?.color ?? 'gray'}>{projectName(id)}</span>) : '未分類'}</td><td className={t.due && t.due <= today && t.status !== '完了' ? s.due : ''}>{shortDate(t.due)}{t.due === today && <small> 今日</small>}</td>{delegated && <td>{t.kind === 'delegated' && t.nextCheck ? shortDate(t.nextCheck) : '—'}</td>}
+      <td>{[...(t.kind === 'delegated' ? [personName(t.owner)] : []), ...(t.relatedPeople ?? []).filter(id => id !== t.owner).map(personName)].join('、') || '—'}</td><td className={t.due && t.due <= today && t.status !== '完了' ? s.due : ''}>{shortDate(t.due)}{t.due === today && <small> 今日</small>}</td>{delegated && <td>{t.kind === 'delegated' && t.nextCheck ? shortDate(t.nextCheck) : '—'}</td>}
     </tr>)}</tbody></table>{rows.length === 0 && <div className={s.empty}>該当するタスクはありません。検索や絞り込みを変更してください。</div>}</div>}</Paged>
   }
 
@@ -92,7 +92,7 @@ function App() {
     </aside>
     <div className={s.mainArea}><header className={s.header}><div><span className={s.muted}>ワークスペース</span><IconChevronRight size={14} /><span>{current.label}</span></div><span className={s.storageLabel}><span className={s.dot} /> {workspace.folder ? 'ローカル保存' : '保存先未選択'}</span></header>
       <main id="main" className={s.main} tabIndex={-1}>
-        <div className={s.pageHeading}><div><h1><current.icon size={28} stroke={2} />{current.label}</h1><p>{page === 'dashboard' ? '未完了件数と期限・確認日を表示します。' : page === 'mine' ? 'タスクの登録・編集・進捗管理。' : page === 'delegated' ? '依頼した作業の進捗と次回確認日を管理。' : page === 'settings' ? 'ラベルと関係者の登録・変更。' : 'ラベルごとのタスク・依頼と進捗を管理。'}</p></div><div className={s.currentDate}><IconCalendar size={17} />{shortDate(today, true)}<small>今日</small></div></div>
+        <div className={s.pageHeading}><div><h1><current.icon size={20} stroke={2} />{current.label}</h1></div><div className={s.currentDate}><IconCalendar size={17} />{shortDate(today, true)}</div></div>
         <StorageBar workspace={workspace} />
         {notes.length > 0 && <section className={s.section} aria-label="以前の確認事項">
           <p>以前の確認事項が{notes.length}件あります。タイトル・詳細・関係者・ラベル・完了状態を保って、自分のタスクへ移せます。</p>
@@ -118,7 +118,7 @@ function App() {
           </div>
           <div className={s.filters}>
             <Choice label="ラベルで絞り込み" value={project} onChange={value => { setProject(value); setFilter('all') }} options={[{ value: 'all', label: 'すべてのラベル' }, ...projects.map(p => ({ value: p.id, label: p.name + (p.archived ? '（アーカイブ済み）' : '') }))]} />
-            {!(page === 'projects' && project !== 'all') && <Choice label="状態で絞り込み" value={filter} onChange={setFilter} options={[{ value: 'all', label: page === 'projects' ? '進行中のラベル' : 'すべての状態' }, ...(page === 'projects' ? [['archived', 'アーカイブ済み'], ['both', 'すべて']] : (page === 'mine' ? mineStatuses : delegatedStatuses).map(v => [v, v])).map(([value, label]) => ({ value, label }))]} />}
+            {page === 'projects' && project === 'all' && <Choice label="ラベルの表示" value={filter} onChange={setFilter} options={[{ value: 'all', label: '進行中' }, { value: 'archived', label: 'アーカイブ済み' }, { value: 'both', label: 'すべて' }]} />}
             {(page === 'delegated' || page === 'mine') && <Choice label="担当者・関係者で絞り込み" value={owner} onChange={setOwner} options={[{ value: 'all', label: 'すべての担当者' }, ...people.map(p => ({ value: p.id, label: p.name }))]} />}
             <Choice label="並び替え" value={sort} onChange={setSort} options={[{ value: 'due', label: '期限が近い順' }, { value: 'title', label: 'タイトル順' }, ...(page !== 'projects' ? [{ value: 'priority', label: '優先度が高い順' }] : [])]} />
 
@@ -132,9 +132,9 @@ function App() {
             <h2 className={s.subheading}>自分のタスク</h2>{taskTable(visibleTasks.filter(t => t.kind === 'mine'))}
             <h2 className={s.subheading}>依頼したタスク</h2>{taskTable(visibleTasks.filter(t => t.kind === 'delegated'), true)}
           </section>}
-          {page === 'projects' && project === 'all' && <Paged key={listKey} items={visibleProjects}>{pageProjects => <div className={s.tableScroll}><table><thead><tr><th scope="col">ラベル</th><th scope="col">未完了</th><th scope="col">完了</th><th scope="col">期限</th><th scope="col">操作</th></tr></thead><tbody>{pageProjects.map(p => {
+          {page === 'projects' && project === 'all' && <Paged key={listKey} items={visibleProjects}>{pageProjects => <div className={s.tableScroll}><table className={s.labelTable}><colgroup><col /><col className={s.colCount} /><col className={s.colCount} /><col className={s.colDate} /><col className={s.colActions} /></colgroup><thead><tr><th scope="col">ラベル</th><th scope="col">未完了</th><th scope="col">完了</th><th scope="col">期限</th><th scope="col">操作</th></tr></thead><tbody>{pageProjects.map(p => {
             const counts = projectCounts(state, p.id)
-            return <tr key={p.id} className={s.interactiveRow} onClick={event => openFromRow(event, () => navigate('projects', p.id))}><td><button className={s.taskTitle} onClick={() => navigate('projects', p.id)}><span className={s.projectTag} data-label-color={p.color ?? 'gray'}>{projectName(p.id)}</span>{p.archived ? '（アーカイブ済み）' : ''}</button><p className={s.projectDescription}>{p.description}</p></td><td>{counts.open}件</td><td>{counts.done}件</td><td>{shortDate(p.due)}</td><td><button className={s.textButton} disabled={workspace.busy} onClick={() => openEditor({ kind: 'project', value: p })}>編集</button><button className={s.textButton} onClick={() => navigate('projects', p.id)}>業務一覧<IconArrowUpRight size={14} /></button></td></tr>
+            return <tr key={p.id} className={s.interactiveRow} onClick={event => openFromRow(event, () => navigate('projects', p.id))}><td><button className={s.taskTitle} onClick={() => navigate('projects', p.id)}><span className={s.projectTag} data-label-color={p.color ?? 'gray'}>{projectName(p.id)}</span>{p.archived ? '（アーカイブ済み）' : ''}</button><p className={s.projectDescription}>{p.description}</p></td><td>{counts.open}件</td><td>{counts.done}件</td><td>{shortDate(p.due)}</td><td><button className={s.textButton} disabled={workspace.busy} onClick={() => openEditor({ kind: 'project', value: p })}>編集</button><button className={s.textButton} onClick={() => navigate('projects', p.id)}>タスクを見る<IconArrowUpRight size={14} /></button></td></tr>
           })}</tbody></table>{visibleProjects.length === 0 && <div className={s.empty}>該当するラベルはありません。</div>}</div>}</Paged>}
 
         </>}

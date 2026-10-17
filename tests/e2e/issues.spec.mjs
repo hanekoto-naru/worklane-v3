@@ -58,7 +58,8 @@ test('任意の関係者ラベル・並び順・複数ラベル・親子関係�
   expect(read(disk).tasks[0].projects).toEqual([parent.id, child.id])
   expect(read(disk).tasks[0].relatedPeople).toEqual([read(disk).people.find(p => p.name === '検証担当A').id])
   const row = page.getByRole('row').filter({ hasText: '複数ラベルの検証' })
-  await expect(row.locator('[data-label-color="green"]')).toHaveText('検証親 / 検証子')
+  await expect(row.locator('td').nth(0)).toContainText('未着手')
+  await expect(row.locator('td').nth(1).locator('[data-label-color="green"]')).toHaveText('検証親 / 検証子')
   await page.reload()
   await page.getByRole('button', { name: '保存先フォルダを選択', exact: true }).click()
   await saved(page)
@@ -129,6 +130,11 @@ test('タスクの列幅は長い内容に変更しても動かない', async ({
   await modal(page).getByRole('button', { name: '変更を反映', exact: true }).click()
   expect(await widths()).toEqual(before)
   await expect(page.getByRole('button', { name: longTitle, exact: true })).toBeVisible()
+  await page.setViewportSize({ width: 1640, height: 1000 })
+  const after = await widths()
+  before.forEach((width, index) => index === 1 ? expect(after[index]).toBeGreaterThan(width) : expect(after[index]).toBeCloseTo(width, 0))
+  const heading = await page.getByRole('heading', { level: 1 }).locator('../..').boundingBox()
+  expect(heading.height).toBeLessThan(50)
 })
 
 test('関係者ラベルが多い場合は検索ダイアログで複数選択できる', async ({ page, disk }) => {
@@ -150,4 +156,18 @@ test('関係者ラベルが多い場合は検索ダイアログで複数選択�
   await modal(page).getByRole('button', { name: '変更を反映', exact: true }).click()
   await saved(page)
   expect(read(disk).people[0].labels).toEqual(['分類0', '分類8'])
+})
+
+test('ラベルと設定の一覧は名前列だけが画面幅に合わせて伸びる', async ({ page }) => {
+  const widths = () => page.locator('thead th').evaluateAll(cells => cells.map(cell => cell.getBoundingClientRect().width))
+  for (const target of ['labels', 'people', 'settings-labels']) {
+    await page.goto(target === 'labels' ? '/#/projects' : '/#/settings')
+    if (target === 'settings-labels') await page.getByRole('group', { name: '設定項目', exact: true }).getByRole('button', { name: 'ラベル', exact: true }).click()
+    await page.setViewportSize({ width: 1440, height: 1000 })
+    const before = await widths()
+    await page.setViewportSize({ width: 1640, height: 1000 })
+    const after = await widths()
+    expect(before.length).toBeGreaterThan(2)
+    before.forEach((width, index) => index === 0 ? expect(after[index]).toBeGreaterThan(width) : expect(after[index]).toBeCloseTo(width, 0))
+  }
 })

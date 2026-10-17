@@ -70,9 +70,8 @@ test('実Chrome: タスクCRUD、検索・絞り込み、URL拒否、XSS安全�
   await modal(page).getByRole('button', { name: '変更を反映', exact: true }).click()
   await page.getByLabel('一覧を検索').fill('検証タスク・変更')
   await expect(page.locator('tbody tr')).toHaveCount(1)
-  await page.getByRole('group', { name: '状態で絞り込み' }).getByRole('button', { name: '完了', exact: true }).click()
-  await expect(page.locator('tbody tr')).toHaveCount(0)
-  await page.getByRole('group', { name: '状態で絞り込み' }).getByRole('button', { name: '保留', exact: true }).click()
+  await expect(page.getByRole('group', { name: '状態で絞り込み' })).toHaveCount(0)
+  await expect(page.locator('tbody tr')).toContainText('保留')
   await page.getByRole('button', { name: '検証タスク・変更', exact: true }).click()
   await confirm(page, () => modal(page).getByRole('button', { name: '削除', exact: true }).click(), /削除/)
   await expect(page.getByRole('button', { name: '検証タスク・変更', exact: true })).toHaveCount(0)
@@ -93,9 +92,10 @@ test('実Chrome: 未保存モーダルで離脱すると警告し、キャンセ
 
 
 test('実Chrome: 初回起動は全一覧が空で、保存先未選択と表示する', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2030-04-15T12:00:00Z'))
   await page.goto('/')
   await expect(page.getByRole('banner')).toContainText('保存先未選択')
-  await expect(page.getByText('今日', { exact: true })).toBeVisible()
+  await expect(page.getByText('2030/4/15（月）', { exact: true })).toBeVisible()
   await expect(page.getByText('デモ基準日', { exact: true })).toHaveCount(0)
   await expect(page.getByRole('navigation').getByRole('button', { name: '確認事項', exact: true })).toHaveCount(0)
   for (const name of ['自分のタスク', '依頼したタスク', 'ラベル', '設定']) {

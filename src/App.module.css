@@ -147,23 +147,18 @@
   display:flex;
   justify-content:space-between;
   align-items:center;
-  gap:20px;
-  margin-bottom:24px;
-  padding-bottom:20px;
-  border-bottom:2px solid var(--text)
+  gap:16px;
+  margin-bottom:12px;
+  padding-bottom:10px;
+  border-bottom:1px solid var(--border)
 }
 .pageHeading h1 {
   display:flex;
   align-items:center;
-  gap:12px;
-  font-size:28px;
+  gap:8px;
+  font-size:20px;
   font-weight:700;
   letter-spacing:0
-}
-.pageHeading p {
-  color:var(--muted);
-  font-size:13px;
-  margin-top:8px
 }
 .currentDate {
   display:flex;
@@ -748,15 +743,18 @@ button:disabled { cursor:not-allowed; opacity:.5; }
 .calendarDays button[aria-current="date"] { border-color: #315cc7; }
 .calendarDays > :nth-child(7n), .calendarDays > :nth-child(7n - 1) { color: #8e4061; }
 
-.taskTable { table-layout: fixed; min-width: 1060px; }
-.taskTable .colTitle { width: 30%; }
-.taskTable .colStatus { width: 130px; }
-.taskTable .colPriority { width: 90px; }
-.taskTable .colPerson { width: 150px; }
-.taskTable .colLabel { width: 180px; }
-.taskTable .colDate { width: 130px; }
-.taskTable td { overflow-wrap: anywhere; white-space: normal; vertical-align: top; }
-.taskTable .taskTitle { min-width: 0; overflow-wrap: anywhere; }
+.taskTable, .labelTable, .settingsTable { table-layout: fixed; min-width: 760px; }
+.colStatus { width: 130px; }
+.colPriority { width: 90px; }
+.colPerson { width: 150px; }
+.colDate { width: 130px; }
+.colCount { width: 90px; }
+.colActions { width: 200px; }
+.colPersonLabels { width: 180px; }
+.taskTable td, .labelTable td, .settingsTable td { overflow-wrap: anywhere; white-space: normal; vertical-align: top; }
+.taskTitle { min-width: 0; overflow-wrap: anywhere; }
+.taskLabels { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.taskLabels .projectTag { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
 .projectTag { display: inline-block; border-radius: 4px; padding: 2px 5px; margin: 2px; white-space: normal; overflow-wrap: anywhere; }
 [data-label-color="gray"] { color: #454f5d; background: #e9edf2; }
 [data-label-color="blue"] { color: #194a9b; background: #e5edff; }
